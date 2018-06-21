@@ -1,0 +1,336 @@
+---
+title: "Exploratory Analysis of the Salaries Dataset"
+author: "Nisha Patel"
+date: "June 21, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE) 
+```
+
+This is an exploratory analysis of the Salaries dataset from the carData package in R. This data was collected from a college in the U.S. that contains information on the 2008-2009 nine-month academic salaries of Assistant Professors, Associate Professors, and Professors. 
+
+Here are some of the questions I try to address in my analysis below:
+
+1. What do the distributions of the variables in this dataset look like?
+
+2. What variables in the dataset can be used to predict nine-month salary for a faculty member?
+
+
+### Code to Install Packages
+```{r, message=FALSE, warning=FALSE, results='hide'}
+
+#### Requires: Package name
+#### Modifies: Nothing
+#### Effects: Installs package if not installed already
+install_packages <- function(pkg) { 
+  
+  # Install package if it is not already
+  if (!(pkg %in% installed.packages()[, "Package"])){ 
+    
+    install.packages(pkg, repos='http://cran.us.r-project.org')
+  }
+  
+  library(pkg, character.only = TRUE)
+  
+} # end installPackages()
+
+pkg_list = c("tidyverse", "modelr", "carData", "car")
+lapply(pkg_list, install_packages)
+```
+
+### Descriptive Statistics 
+
+Let's take a look at the variables in this dataset:
+
+```{r, cache=TRUE}
+df <- Salaries
+nrow(df)
+colnames(df)
+
+```
+
+In total, there are 397 observations and 6 variables (n = 367, p = 6). 
+
+Let's first take a look at the 3 qualitative variables in the dataset: rank, discipline, and sex.
+
+### Qualitative Variables
+```{r, cache=TRUE}
+rank_sum <- summary(df$rank)
+discpl_sum <- summary(df$discipline)
+sex_sum <- summary(df$sex)
+
+rank_sum
+discpl_sum
+sex_sum
+```
+
+
+It appears that a majority of the recorded observations come from Professors (n = 266) with about the same number of data points from Assistant Professors (n = 67) and Associate Professors (n = 64). Fewer faculty members in the dataset work under "Theoretical" departments (coded as A under discipline) compared to the "Applied" departments (coded as B under discipline). There are a lot more male faculty members represented in the dataset (n = 358) compared to female faculty members (n = 39).
+
+### Quantitative Variable Distributions
+There are 3 quantitative variables in the Salaries dataset: nine-month salary, years since Ph.D., and years of service. The distributions of these are shown below.
+
+### Nine-Month Salary 
+```{r, echo=TRUE, cache=TRUE}
+
+salary_hist <- df %>% ggplot() +
+ geom_histogram(aes(x = salary), color = "black", fill = "blue", bins = 50) +
+  labs(x = "Nine-Month Salary (in dollars)", y = "Count", 
+       title = "Nine-Month Salary Distribution")
+
+salary_hist
+
+summary(df$salary)
+
+```
+
+The distribution for the nine-month salary variable above seems to be skewed right. The Median nine-month salary is \$107,300 compared to the mean of \$113,706. The minimum salary of a faculty member is \$57,800 and the maximum salary is \$231,545. 
+
+
+### Years since Ph.D. 
+```{r, cache=TRUE}
+phd_hist <- df %>% ggplot() +
+  geom_histogram(aes(x = yrs.since.phd), color = "black", fill = "green", bins = 50) +
+  labs(x = "Years since Ph.D.", y = "Count", 
+       title = "Years since Ph.D. Distribution")
+
+phd_hist
+
+summary(df$yrs.since.phd)
+```
+
+The years since obtaining a Ph.D. variable seems to take on a relatively normal distribution, perhaps showing slight skewness to the right. The median number of years since receiving a Ph.D. for faculty members is 21 years whereas the mean is ~22 years (rounded from the estimate of 22.31 years). Thus 50% of the faculty members received their Ph.D. between 1-21 years ago whereas the other 50% received their Ph.D. between 21-56 years ago.
+
+### Years of Service 
+```{r, cache=TRUE}
+service_hist <- df %>% ggplot() +
+  geom_histogram(aes(x = yrs.service), color = "black", fill = "orange", bins = 50) +
+  labs(x = "Years of Service", y = "Count", 
+       title = "Years of Service Distribution")
+
+service_hist
+
+summary(df$yrs.service)
+```
+
+The distribution of years of service seems to be slightly skewed right, similar to the distribution of years since Ph.D. The median number of years that faculty members have served is 16 years whereas the mean is ~17 years (rounded from the estimate 17.61 years). 
+
+As we move into assessing the relationship between variables and then modeling, I want to address any observations that should perhaps be excluded from analysis. For example, it may be reasonable to exclude faculty members in the dataset with < 1 year of service. 
+
+```{r}
+exclude_service <- df %>% filter(yrs.service < 1) %>% nrow()
+exclude_service
+```
+
+
+One possible explanation for why these 11 people have < 1 year of service is that they just started working at the University when this data was collected. In future analyses, I would recommend seeing what happens when these individuals are taken out of the dataset. 
+
+However, for the regression analyses I present later on in this report, I will keep them in! Since only 11 people would be removed, I don't expect them to dramatically affect results. Furthermore as seen above, there is no indication of extreme skewness in the data. 
+
+
+### Assessing Years since Ph.D., Salary, and Rank
+```{r, echo=FALSE, cache=TRUE}
+
+phd_salary_rank <-  df %>% ggplot() + 
+    geom_point(aes(x = yrs.since.phd, y = salary, color = rank)) +
+    labs(x = "Years since Ph.D.", y = "Nine-Month Salary (in Dollars)",
+       title = "Nine-Month Salary vs. Years since Ph.D.")
+
+phd_salary_rank
+```
+
+
+It appears that years since Ph.D. is somewhat positively correlated with salary. Generally, as the number of years since a faculty member received their Ph.D. increases, their salary increases as well.
+
+Furthermore, it appears that rank is also somewhat positively correlated with years since Ph.D. and salary as well. Assistant Professors appear to have the lowest nine-month salaries receiving between \$57,800-\$100,000 (the minimum from above was found to be $57,800. Associate Professors receive a nine-month salary in the range of \$50,000-\$125,000. Professors tend to have the highest range in nine-month salaries based on the graph. 
+
+It is possible that the relationship between years since Ph.D. and nine-month salary is non-linear (quadratic specifically) based on the slight curve pattern in the observations from the plot.
+
+### Assessing Years since Ph.D., Salary, and Discipline
+```{r, cache=TRUE}
+phd_discipl_rank <-  df %>% ggplot() + 
+    geom_point(aes(x = yrs.since.phd, y = salary, color = discipline)) +
+    labs(x = "Years since Ph.D.", y = "Nine-Month Salary (in Dollars)",
+       title = "Nine-Month Salary vs. Years since Ph.D.")
+
+phd_discipl_rank
+```
+
+There does not appear to be a strong relationship between salary and discipline or even between discipline and years since Ph.D. However, it does appear that the data points from faculty members in applied departments are situated higher than data points from faculty members in theoretical departments. 
+
+### Assessing Salary, Years of Service, and Rank
+```{r, cache=TRUE}
+service_salary <-  df %>% ggplot() + 
+    geom_point(aes(x = yrs.service, y = salary, color=rank)) +
+    labs(x = "Years of Service", y = "Nine-Month Salary (in Dollars)",
+       title = "Nine-Month Salary vs. Years of Service")
+
+service_salary
+```
+
+
+There does not appear to be a strong relationship between nine-month salary and years of service, but there is somewhat a relationship between rank and years of service as expected. Faculty members that are Professors or Associate Professors tend to have served longer in departments and therefore hold higher positions and get paid more compared to Assistant Professors. 
+
+### Assessing Salary, Sex, Years of Service
+```{r, cache=TRUE}
+sex_salary <-  df %>% ggplot() + 
+    geom_point(aes(x = yrs.since.phd, y = salary, color=sex)) +
+    labs(x = "Years of Service", y = "Nine-Month Salary (in Dollars)",
+       title = "Nine-Month Salary vs. Years of Service")
+
+sex_salary
+```
+
+There does not appear to be a strong relationship between nine-month salary and sex or between sex and years of service. However, as noted previously, more observations in this dataset are from male faculty members (n = 358) compared to female faculty members (n = 39 ).
+
+## Regression Analyses
+Now, let's try to predict nine-month salary. Which variables in the dataset affect salary? 
+
+Let's take a brief look at salary regressed upon the variables in simple linear regression models (SLR):
+
+### SLR: Salary~Rank
+```{r}
+mod_rank_slr <- lm(salary~rank, data = df)
+summary(mod_rank_slr)
+```
+
+According to these results, rank does contribute to nine-month salary at this college as expected. Professors and Associate Professors tend to be more experienced than Assistant Professors and thus paid more in accordance with their faculty positions. The baseline group in this case is Assistant Professors. While Assistant Professors at this college have an average nine-month salary of \$80,776, Associate Professors earn an additional \$13,100 compared to Assistant Professors. Similarly, Professors earn an additional \$45,996 compared to the nine-month salary of Assistant Professors. The amount of variance in salary explained by rank in this model is around 39%. 
+
+
+### SLR: Salary~Sex
+```{r}
+mod_sex_slr <- lm(salary~sex, data =df)
+summary(mod_sex_slr)
+
+```
+
+Although the coefficient for the predictor sex is found to be significant in the model, sex only explains around 2% of the variance in salary in this model. These results can be interpreted as saying female faculty members at this college make an average nine-month salary of \$101,002 whereas male faculty members make an additional $14,088 more on top of that. 
+
+
+### SLR: Salary~Discipline
+```{r}
+mod_discpl_slr <- lm(salary~discipline, data = df)
+summary(mod_discpl_slr)
+```
+
+Similar to the results above for sex, the coefficient of discipline is found to be significant, but only explains around 2% of the variance in salary in this model. The baseline group is A which suggests that faculty members in theoretical departments make on average \$108,548 whereas faculty members in applied departments (B) make an additional $9,480 beyond that of members in theoretical departments.
+
+### SLR: Salary~Years since Ph.D.
+```{r}
+mod_phd_slr <- lm(salary~yrs.since.phd, data = df)
+summary(mod_phd_slr)
+```
+
+
+From this regression model, years since Ph.D. explains about 17% of the variance in salary. For each additional year since receiving their Ph.D., a faculty member's salary estimate increases by an additional \$985.30.
+
+### SLR: Salary~Years of Service
+```{r}
+mod_service_slr <- lm(salary~yrs.service,data=df)
+summary(mod_service_slr)
+
+```
+
+From this regression model, years of service explains about 11% of the variance in salary. For each additional year a faculty member has served, their salary estimate increases by an additional \$779.60.
+
+## Full Multiple Linear Regression Model 
+
+Here are the results of the first multiple linear regression model I ran: the full model with salary regressed on all predictors.
+```{r}
+full_mod <- lm(salary~., data = df)
+
+summary(full_mod)
+```
+
+
+It is clear in this model that the least statistically significant variable is sex (with a p-value of ~0.22). Interestingly, the coefficient for years of service has switched signs. In the SLR model above run with years of service (Salary~Years of Service), the coefficient was \$779.60 whereas in the full model here it is \$-489.50. This could be a sign of collinearity. I'll come back to this later. 
+
+For now, let's see what happens if we take out the predictor sex. In this case, I think removing sex is justified because it is statistically insignificant in the model. 
+
+```{r}
+mod_no_sex <- lm(salary~rank+discipline+yrs.since.phd+yrs.service, data=df)
+summary(mod_no_sex)
+```
+
+
+In this model, all variables are found to be significant with p-values <0.05. The adjusted R-squared value did not change much with the removal of the predictor sex. The coefficient for years of service is still negative, but reduced to \$-476.70.
+
+
+Is there evidence of collinearity? We did see above that years since Ph.D., rank, and years of service show some of the strongest associations with salary and somewhat correlate with each other. 
+
+To check this, let's compute the Variance Inflation Factor (VIF) for the model above.
+
+```{r}
+car::vif(mod = mod_no_sex)
+```
+
+According to the results, the VIF for years since Ph.D. is 7.52 and for years of service is 5.91. A VIF value >5 or >10 is a sign of collinearity that can considerably affect results. Let's dig into this by first assessing what happens if we take out years since Ph.D. 
+
+
+```{r}
+mod_no_phd <- lm(salary~discipline+yrs.service+rank,
+                  data = df)
+
+summary(mod_no_phd)
+
+car::vif(mod_no_phd)
+```
+
+
+In this model, taking out years since Ph.D. solved collinearity a little. The VIF estimate for years of service went down to 1.61. However, the sign of the coefficient for years of service is still negative.
+
+Let's instead try removing rank from the model instead of years since Ph.D.
+
+
+```{r}
+mod_no_rank <- lm(salary~discipline+yrs.since.phd+yrs.service,
+                  data = df)
+
+summary(mod_no_rank)
+
+car::vif(mod_no_rank)
+```
+
+
+Removing rank from the model did not solve the issue - the sign of years of service is still negative. As for collinearity, years since Ph.D. and years of service both have a VIF > 5.
+
+
+Now what happens when we take out years of service instead of rank?
+```{r}
+mod_no_service <-lm(salary~discipline+yrs.since.phd+rank,
+                  data = df)
+
+summary(mod_no_service)
+
+car::vif(mod_no_service)
+```
+
+In this case, taking out years of service did not change the adjusted R-squared value much compared to the full model and none of the remaining variables have a high VIF. 
+
+I think taking out years of service as a variable is justified in this case. Since there was a collinearity issue, taking out one of the problematic variables is a way to control for collinearity. Since collinearity means 2 or more variables are closely related, removing one of the variables does not affect the amount of information in the model (you are essentially removing redundant information). 
+
+
+Furthermore, in this model, by taking out years of service, the adjusted R-squared was not affected significantly compared to the model fit with all the variables except sex. Even though the coefficient for years since Ph.D. drops out of significance, I think this model is reasonable. Instead of removing one of the collinear variables from the model, an alternative solution is to combine the variables that are collinear with each other into a single variable to run in the model. On the other hand, more observations and a better understanding of the factors affecting salary at this university are needed in order to develop a more informative model to predict salary.  
+
+From this brief analysis, I believe that the best multiple linear regression model I can currently construct for the Salaries dataset in order to predict nine-month salary has the two predictors rank and discipline.
+
+Here is a summary of this final model and a look at its residuals.
+```{r}
+mod_final <- lm(salary~discipline+rank,data=df)
+summary(mod_final)
+
+# plot residuals vs. fitted values
+plot(mod_final, which = 1)
+
+```
+
+
+The predictors in this case explain ~44% of the variance in nine-month salary. I think this is justified because there are still other factors that contribute to determining nine-month salary for faculty members at this college that are absent in this dataset or not well understood yet (such as years since Ph.D. and years of service). However, it should be noted that the residual plot is not free of patterns. Therefore, there is still work to do in order to identify the best model. 
+
+One missing influential factor could be which college at the University a department may be listed under. This can affect how much money from a budget a department has to spread amongst its faculty. Another consideration is how the non-academic job market affects university jobs. If a field has a thriving non-academic job market, then universities need to account for that and perhaps offer higher salaries to hire faculty members in that particular field.
+
+That's it for now! Thank you for taking a brief look at my preliminary findings from the Salaries dataset. I enjoyed doing exploratory analysis on this dataset and running some regression models. As I continue to develop my skills, I will definitely come back and update my work!
+
+
