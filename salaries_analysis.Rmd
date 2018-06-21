@@ -2,7 +2,7 @@
 title: "Exploratory Analysis of the Salaries Dataset"
 author: "Nisha Patel"
 date: "June 21, 2018"
-output: html_document
+output: github_document
 ---
 
 ```{r setup, include=FALSE}
