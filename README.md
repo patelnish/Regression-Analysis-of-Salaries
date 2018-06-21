@@ -1,6 +1,4 @@
-This repository contains code to explore the Salaries dataset in R.
-
-The Salaries dataset in R can be found in the carData package. The data was collected from a college in the U.S. and contains information on the 2008-2009 nine-month academic salaries of Assistant Professors, Associate Professors, and Professors.
+This repository contains code to explore the Salaries dataset in R (found in the carData package). The data was collected from a college in the U.S. and contains information on the 2008-2009 nine-month academic salaries of Assistant Professors, Associate Professors, and Professors.
 
 
 Specifically, my analysis aimed to:
